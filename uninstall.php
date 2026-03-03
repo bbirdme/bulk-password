@@ -7,3 +7,6 @@ if (!defined('WP_UNINSTALL_PLUGIN')) {
 
 delete_option('pass_protect_all_select_types');
 delete_option('pass_protect_all_pass_field');
+delete_option('pass_protect_all_time_enable');
+delete_option('pass_protect_all_time_start');
+delete_option('pass_protect_all_time_end');

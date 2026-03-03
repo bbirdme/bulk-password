@@ -10,7 +10,6 @@ Author URI: http://bbird.me/
 Text Domain: pass_protect_all
 License: GNU General Public License v3.0
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
-
 */
 
 // Making sure to direct access to this file
@@ -82,14 +81,47 @@ function pass_protect_all_settings_init(  ) {
             'pass_protect_all_pass_field' // Option ID
         )  
 	);
+
+	add_settings_field( 
+		'pass_protect_all_time_enable', 
+		__( 'Enable Time-Based Protection', 'pass_protect_all' ), 
+		'pass_protect_all_time_enable_render', 
+		'pass_protect_all_settings_page', 
+		'pass_protect_all_settings_section' ,
+                  array( 
+            'pass_protect_all_time_enable' // Option ID
+        )  
+	);
+
+	add_settings_field( 
+		'pass_protect_all_time_start', 
+		__( 'Protection Start Time (HH:MM)', 'pass_protect_all' ), 
+		'pass_protect_all_time_start_render', 
+		'pass_protect_all_settings_page', 
+		'pass_protect_all_settings_section' ,
+                  array( 
+            'pass_protect_all_time_start' // Option ID
+        )  
+	);
+
+	add_settings_field( 
+		'pass_protect_all_time_end', 
+		__( 'Protection End Time (HH:MM)', 'pass_protect_all' ), 
+		'pass_protect_all_time_end_render', 
+		'pass_protect_all_settings_page', 
+		'pass_protect_all_settings_section' ,
+                  array( 
+            'pass_protect_all_time_end' // Option ID
+        )  
+	);
         
         register_setting( 'pass_protect_all_settings_page', 'pass_protect_all_select_types' );   // A settings group name, the name of an option to sanitize and save
         register_setting( 'pass_protect_all_settings_page', 'pass_protect_all_pass_field' );
-
+        register_setting( 'pass_protect_all_settings_page', 'pass_protect_all_time_enable' );
+        register_setting( 'pass_protect_all_settings_page', 'pass_protect_all_time_start' );
+        register_setting( 'pass_protect_all_settings_page', 'pass_protect_all_time_end' );
 
 }
-
-
 
 function pass_protect_all_select_types_render($args)  { // Function which pulls post types into array and outputs as checkbox
     
@@ -121,17 +153,66 @@ function pass_protect_all_pass_field_render($args) {  // Function which renders 
    
 }
 
+function pass_protect_all_time_enable_render($args) {  // Function which renders time protection checkbox
+    
+    $option = get_option($args[0]);
+    $checked = $option ? 'checked="checked"' : '';
+    echo '<input type="checkbox" id="'. $args[0] .'" name="'. $args[0] .'" value="1" '. $checked .' />';
+    echo '<label for="'. $args[0] .'"> ' . __( 'Protect posts only during specific hours', 'pass_protect_all' ) . '</label>';
+    echo '<p class="description">' . __( 'If enabled, password protection will only be active between the specified start and end times.', 'pass_protect_all' ) . '</p>';
+}
+
+function pass_protect_all_time_start_render($args) {  // Function which renders time start field
+    
+    $option = get_option($args[0]);
+    echo '<input type="time" id="'. $args[0] .'" name="'. $args[0] .'" value="' . $option . '" />';
+    echo '<p class="description">' . __( 'Example: 09:00', 'pass_protect_all' ) . '</p>';
+}
+
+function pass_protect_all_time_end_render($args) {  // Function which renders time end field
+    
+    $option = get_option($args[0]);
+    echo '<input type="time" id="'. $args[0] .'" name="'. $args[0] .'" value="' . $option . '" />';
+    echo '<p class="description">' . __( 'Example: 17:00', 'pass_protect_all' ) . '</p>';
+}
+
 
 function pass_protect_all_set_password($post_object) { //Function which sets password for chosen post types
      
     $chosen_post_types = get_option("pass_protect_all_select_types"); 
     $post_password     = get_option("pass_protect_all_pass_field"); 
-     if( is_array($chosen_post_types)):
-     foreach ($chosen_post_types as $types) {
-         if ($post_object->post_type==$types) {
-		  $post_object->post_password = $post_password;
-	}   
+    $time_enabled      = get_option("pass_protect_all_time_enable");
+    $time_start        = get_option("pass_protect_all_time_start");
+    $time_end          = get_option("pass_protect_all_time_end");
+    
+    // Check if time-based protection is enabled
+    $should_protect = true;
+    
+    if ($time_enabled) {
+        $current_time = date('H:i');
+        
+        // Check if current time is within protection window
+        if ($time_start && $time_end) {
+            if ($time_start <= $time_end) {
+                // Normal case: 09:00 to 17:00
+                $should_protect = ($current_time >= $time_start && $current_time <= $time_end);
+            } else {
+                // Overnight case: 22:00 to 06:00
+                $should_protect = ($current_time >= $time_start || $current_time <= $time_end);
+            }
+        }
     }
+    
+    if( is_array($chosen_post_types)):
+         foreach ($chosen_post_types as $types) {
+             if ($post_object->post_type==$types) {
+                if ($should_protect) {
+                    $post_object->post_password = $post_password;
+                } else {
+                    $post_object->post_password = ''; // Remove password outside protection hours
+                }
+            }   
+         }
     endif;
 }
 add_action('the_post', 'pass_protect_all_set_password');
